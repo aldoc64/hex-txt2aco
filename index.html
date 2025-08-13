@@ -80,7 +80,7 @@ function parseHEX(text) {
     const line = raw.trim();
     if (!line) continue;
 
-    const m = line.match(/^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{8})\s*(.*)?$/);
+    const m = line.match(/^#?([0-9a-fA-F]{8}|[0-9a-fA-F]{6})\s*(.*)?$/); // CORREZIONE: Regex modificata
     if (m) {
       let hex = m[1];
       if (hex.length === 8) {
@@ -152,7 +152,6 @@ fileInput.addEventListener('change', async (e)=>{
   currentColors = parsed;
   renderPreview(currentColors);
   showMessage(`Importati ${parsed.length} colori`);
-
   const baseName = f.name.split('.').slice(0, -1).join('.');
   filenameInput.value = `${baseName}.aco`;
 });
@@ -177,7 +176,6 @@ drop.addEventListener('drop', async (e)=>{
   currentColors = parsed;
   renderPreview(currentColors);
   showMessage(`Importati ${parsed.length} colori`);
-
   const baseName = f.name.split('.').slice(0, -1).join('.');
   filenameInput.value = `${baseName}.aco`;
 });
