@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GPL / HEX → ACO — Single-file converter</title>
+  <style>
+    :root{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    body{background:#f7fafc;color:#0f172a;margin:0;padding:20px}
+    .wrap{max-width:900px;margin:0 auto;background:white;padding:18px;border-radius:10px;box-shadow:0 6px 18px rgba(12,23,40,0.06)}
+    h1{margin:0 0 8px;font-size:20px}
+    p.note{margin:6px 0 16px;color:#475569;font-size:13px}
+    .row{display:flex;gap:12px}
+    .col{flex:1}
+    label{display:block;font-weight:600;margin-bottom:6px}
+    input[type=file], textarea, input[type=text]{width:100%;padding:8px;border:1px solid #e6edf3;border-radius:6px}
+    textarea{min-height:120px;font-family:monospace}
+    .btn{display:inline-block;padding:8px 12px;border-radius:8px;border:none;background:#0ea5e9;color:white;cursor:pointer}
+    .btn.ghost{background:white;border:1px solid #cbd5e1;color:#0f172a}
+    .preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(56px,1fr));gap:8px;margin-top:12px}
+    .swatch{height:56px;border-radius:6px;border:1-solid #e6edf3;display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(0,0,0,0.6)}
+    .footer{font-size:12px;color:#64748b;margin-top:12px}
+    .message{margin-top:8px;color:#0f172a}
+    .drop{border:2px dashed #e2e8f0;padding:12px;border-radius:8px;text-align:center;color:#64748b}
+    a.link{color:#0ea5e9}
+    .small{font-size:12px;color:#64748b}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Convertitore .gpl / .hex → .aco (single-file)</h1>
+    <p class="note">Carica un file .gpl (GIMP), un semplice file di testo con codici <code>#RRGGBB</code>, oppure incolla la lista nella textarea. Scarica un <code>.aco</code> compatibile con Photoshop / Photopea.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:12px;align-items:start">
+      <div>
+        <label>File (.gpl, .hex, .txt)</label>
+        <input id="file" type="file" accept=".gpl,.hex,.txt,.pal" />
+
+        <div style="height:10px"></div>
+
+        <label>oppure incolla qui (es. <code>#ff0000</code> per riga)</label>
+        <textarea id="paste" placeholder="#ff0000\n#00ff00 My green\n#0000ff"></textarea>
+
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button id="importText" class="btn">Importa dal testo</button>
+          <button id="clear" class="btn ghost">Pulisci</button>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div id="drop" class="drop">Oppure trascina qui un file .gpl / .hex</div>
+
+        <div class="message" id="message"></div>
+      </div>
+
+      <div>
+        <label>Anteprima</label>
+        <div id="preview" class="preview"></div>
+
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button id="download" class="btn">Converti & Scarica .aco</button>
+          <button id="downloadName" class="btn ghost">Imposta nome...</button>
+        </div>
+
+        <div style="margin-top:8px">
+          <input id="filename" type="text" placeholder="palette.aco" value="palette.aco" />
+        </div>
+
+        <div class="footer">Nota: genera sia ACO versione 1 che versione 2 (nomi inclusi). Funziona offline nel browser.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <strong>Come pubblicare su GitHub (rapido):</strong>
+      <ol class="small">
+        <li>Crea un nuovo repository su GitHub.</li>
+        <li>Carica questo file (nome suggerito <code>index.html</code>).</li>
+        <li>Vai su Settings → Pages → scegli branch <code>main</code> e root (/), salva. Dopo qualche secondo avrai un URL <code>https://tuo-utente.github.io/tuo-repo/</code>.</li>
+      </ol>
+    </div>
+  </div>
+
+<script>
+// ---------- Utility parsing functions ----------
+function parseGPL(text) {
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  for (let raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('#')) continue;
+    if (/^gimp palette/i.test(line)) continue;
+    if (/^[A-Za-z\-]+:/.test(line)) continue;
+    const m = line.match(/^\s*(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})\s*(.*)?$/); 
+    if (m) {
+      const r = Math.max(0, Math.min(255, parseInt(m[1],10)));
+      const g = Math.max(0, Math.min(255, parseInt(m[2],10)));
+      const b = Math.max(0, Math.min(255, parseInt(m[3],10)));
+      const name = (m[4]||'').trim();
+      out.push({r,g,b,name});
+    }
+  }
+  return out;
+}
+function parseHEX(text) {
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  for (let raw of lines) {
+    let line = raw.trim(); if(!line) continue;
+    const m = line.match(/#?([0-9a-fA-F]{6})/);
+    if (m) {
+      const hex = m[1];
+      const r = parseInt(hex.substring(0,2),16);
+      const g = parseInt(hex.substring(2,4),16);
+      const b = parseInt(hex.substring(4,6),16);
+      const nameMatch = line.match(/#?[0-9a-fA-F]{6}\s+(.*)$/);
+      const name = nameMatch ? nameMatch[1].trim() : '';
+      out.push({r,g,b,name});
+    }
+  }
+  return out;
+}
+
+function detectAndParse(text, filename=''){
+  const ext = (filename.split('.').pop()||'').toLowerCase();
+  let parsed = [];
+  if (ext === 'gpl' || /gimp palette/i.test(text)) parsed = parseGPL(text);
+  else if (ext === 'hex' || /#?[0-9a-fA-F]{6}/.test(text)) parsed = parseHEX(text);
+  else {
+    parsed = parseGPL(text);
+    if (parsed.length === 0) parsed = parseHEX(text);
+  }
+  return parsed;
+}
+
+// ---------- ACO builder (big-endian byte array) ----------
+function component8to16(v){ return Math.round(v * 257); } // 0..255 -> 0..65535
+function pushUint16(arr, v){ arr.push((v>>8)&0xFF); arr.push(v&0xFF); }
+function pushUint32(arr, v){ arr.push((v>>24)&0xFF); arr.push((v>>16)&0xFF); arr.push((v>>8)&0xFF); arr.push(v&0xFF); }
+function pushUTF16BE(arr, str){ for (let i=0;i<str.length;i++){ const code = str.charCodeAt(i); arr.push((code>>8)&0xFF); arr.push(code&0xFF); } }
+
+function buildACO(colors){
+  const bytes = [];
+  const n = colors.length;
+  // Version 1
+  pushUint16(bytes,1);
+  pushUint16(bytes,n);
+  for (const c of colors){ pushUint16(bytes,0); pushUint16(bytes,component8to16(c.r)); pushUint16(bytes,component8to16(c.g)); pushUint16(bytes,component8to16(c.b)); pushUint16(bytes,0); }
+  // Version 2
+  pushUint16(bytes,2);
+  pushUint16(bytes,n);
+  for (const c of colors){ pushUint16(bytes,0); pushUint16(bytes,component8to16(c.r)); pushUint16(bytes,component8to16(c.g)); pushUint16(bytes,component8to16(c.b)); pushUint16(bytes,0);
+    const name = c.name||''; const nameLen = name.length; pushUint32(bytes,nameLen);
+    if (nameLen>0) pushUTF16BE(bytes,name);
+    pushUint16(bytes,0); // terminator
+  }
+  return new Uint8Array(bytes);
+}
+
+// ---------- UI wiring ----------
+const fileInput = document.getElementById('file');
+const paste = document.getElementById('paste');
+const importText = document.getElementById('importText');
+const clearBtn = document.getElementById('clear');
+const preview = document.getElementById('preview');
+const message = document.getElementById('message');
+const download = document.getElementById('download');
+const filenameInput = document.getElementById('filename');
+const drop = document.getElementById('drop');
+let currentColors = [];
+
+function showMessage(txt){ message.textContent = txt || ''; }
+function renderPreview(colors){ preview.innerHTML=''; if(!colors||colors.length===0){ preview.innerHTML='<div class="small">Nessuna anteprima disponibile</div>'; return; } for (const c of colors){ const d = document.createElement('div'); d.className='swatch'; d.style.background = `rgb(${c.r},${c.g},${c.b})`; d.title = `${c.name||''} rgb(${c.r},${c.g},${c.b})`; d.textContent = ''; preview.appendChild(d); } }
+
+fileInput.addEventListener('change', async (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const txt = await f.text();
+  const parsed = detectAndParse(txt,f.name);
+  if(parsed.length===0){
+    showMessage('Nessun colore riconosciuto');
+    return;
+  }
+  currentColors = parsed;
+  renderPreview(currentColors);
+  showMessage(`Importati ${parsed.length} colori`);
+
+  // IMPOSTA NOME FILE: rimuove l'estensione e aggiunge .aco
+  const baseName = f.name.split('.').slice(0, -1).join('.');
+  filenameInput.value = `${baseName}.aco`;
+});
+
+importText.addEventListener('click', ()=>{
+  const txt = paste.value; if(!txt) return showMessage('Incolla prima qualcosa'); const parsed = detectAndParse(txt,'pasted.txt'); if(parsed.length===0) return showMessage('Nessun colore riconosciuto nel testo'); currentColors = parsed; renderPreview(currentColors); showMessage(`Importati ${parsed.length} colori`);
+});
+
+clearBtn.addEventListener('click', ()=>{ paste.value=''; fileInput.value=''; currentColors=[]; renderPreview([]); showMessage('Pulito'); });
+
+// drag & drop
+['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.style.borderColor='#94a3b8'; }));
+['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.style.borderColor='#e2e8f0'; }));
+drop.addEventListener('drop', async (e)=>{
+  const f = e.dataTransfer.files[0];
+  if(!f) return;
+  const txt = await f.text();
+  const parsed = detectAndParse(txt,f.name);
+  if(parsed.length===0){
+    showMessage('Nessun colore riconosciuto');
+    return;
+  }
+  currentColors = parsed;
+  renderPreview(currentColors);
+  showMessage(`Importati ${parsed.length} colori`);
+
+  // IMPOSTA NOME FILE: rimuove l'estensione e aggiunge .aco
+  const baseName = f.name.split('.').slice(0, -1).join('.');
+  filenameInput.value = `${baseName}.aco`;
+});
+
+// download
+download.addEventListener('click', ()=>{
+  if(!currentColors || currentColors.length===0) return showMessage('Nessun colore da esportare');
+  const data = buildACO(currentColors);
+  const blob = new Blob([data],{type:'application/octet-stream'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download = filenameInput.value || 'palette.aco'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); showMessage('Scaricato ' + a.download);
+});
+
+// init
+renderPreview([]);
+</script>
+</body>
+</html>
