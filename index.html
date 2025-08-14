@@ -124,9 +124,21 @@ function buildACO(colors){
   // Version 2
   pushUint16(bytes,2);
   pushUint16(bytes,n);
-  for (const c of colors){ pushUint16(bytes,0); pushUint16(bytes,component8to16(c.r)); pushUint16(bytes,component8to16(c.g)); pushUint16(bytes,component8to16(c.b)); pushUint16(bytes,0);
-    const name = c.name||''; const nameLen = name.length; pushUint32(bytes,nameLen);
-    if (nameLen>0) pushUTF16BE(bytes,name);
+  for (const c of colors){
+    pushUint16(bytes,0);
+    pushUint16(bytes,component8to16(c.r));
+    pushUint16(bytes,component8to16(c.g));
+    pushUint16(bytes,component8to16(c.b));
+    pushUint16(bytes,0);
+    const name = c.name||'';
+    const nameLen = name.length;
+    // CORREZIONE: La lunghezza è solo la lunghezza della stringa, non la lunghezza della stringa + 1.
+    pushUint32(bytes,nameLen);
+    if (nameLen>0) {
+      pushUTF16BE(bytes,name);
+    }
+    // CORREZIONE: Aggiungi sempre il terminatore nullo, che è un campo a sé stante e non viene conteggiato nel campo di lunghezza.
+    pushUint16(bytes,0);
   }
   return new Uint8Array(bytes);
 }
