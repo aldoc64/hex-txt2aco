@@ -97,6 +97,8 @@ function parseHEX(text) {
       out.push({ r, g, b, name });
     }
   }
+  // DEBUG: Stampa l'array di colori nella console prima di restituirlo
+  console.log('Contenuto della variabile "out" dopo la conversione:', out);
   return out;
 }
 
@@ -125,7 +127,6 @@ function buildACO(colors){
   for (const c of colors){ pushUint16(bytes,0); pushUint16(bytes,component8to16(c.r)); pushUint16(bytes,component8to16(c.g)); pushUint16(bytes,component8to16(c.b)); pushUint16(bytes,0);
     const name = c.name||''; const nameLen = name.length; pushUint32(bytes,nameLen);
     if (nameLen>0) pushUTF16BE(bytes,name);
-    pushUint16(bytes,0); // terminator
   }
   return new Uint8Array(bytes);
 }
