@@ -30,43 +30,31 @@
   <div class="wrap">
     <h1>Convertitore .hex / .txt → .aco (single-file)</h1>
     <p class="note">Carica un semplice file di testo con codici <code>#RRGGBB</code>, oppure incolla la lista nella textarea. Scarica un <code>.aco</code> compatibile con Photoshop / Photopea.</p>
-    <p class="note">Funziona anche offline nel browser</p>
-
     <div style="display:grid;grid-template-columns:1fr 320px;gap:12px;align-items:start">
       <div>
         <label>File (.hex, .txt)</label>
         <input id="file" type="file" accept=".hex,.txt,.pal" />
-
         <div style="height:10px"></div>
-
         <label>oppure incolla qui (es. <code>#ff0000</code> per riga)</label>
         <textarea id="paste" placeholder="#ff0000\n#00ff00 My green\n#0000ff"></textarea>
-
         <div style="margin-top:8px;display:flex;gap:8px">
           <button id="importText" class="btn">Importa dal testo</button>
           <button id="clear" class="btn ghost">Pulisci</button>
         </div>
-
         <div style="height:10px"></div>
-
         <div id="drop" class="drop">Oppure trascina qui un file .hex / .txt</div>
-
         <div class="message" id="message"></div>
       </div>
-
       <div>
         <label>Anteprima</label>
         <div id="preview" class="preview"></div>
-
         <div style="margin-top:12px;display:flex;gap:8px">
           <button id="download" class="btn">Converti & Scarica .aco</button>
           <button id="downloadName" class="btn ghost">Imposta nome...</button>
         </div>
-
         <div style="margin-top:8px">
           <input id="filename" type="text" placeholder="palette.aco" value="palette.aco" />
         </div>
-
         <div class="footer">
           <script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script>
           <script type='text/javascript'>kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'Z8Z4XHWCD');kofiwidget2.draw();</script> 
@@ -74,7 +62,6 @@
       </div>
     </div>
   </div>
-
 <script>
 // ---------- Utility parsing functions ----------
 function parseHEX(text) {
@@ -83,8 +70,7 @@ function parseHEX(text) {
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
-
-    const m = line.match(/^#?([0-9a-fA-F]{8}|[0-9a-fA-F]{6})\s*(.*)?$/); // CORREZIONE: Regex modificata
+    const m = line.match(/^#?([0-9a-fA-F]{8}|[0-9a-fA-F]{6})\s*(.*)?$/);
     if (m) {
       let hex = m[1];
       if (hex.length === 8) {
@@ -97,23 +83,19 @@ function parseHEX(text) {
       out.push({ r, g, b, name });
     }
   }
-  // DEBUG: Stampa l'array di colori nella console prima di restituirlo
   console.log('Contenuto della variabile "out" dopo la conversione:', out);
   return out;
 }
-
 function detectAndParse(text) {
   let parsed = [];
   parsed = parseHEX(text);
   return parsed;
 }
-
 // ---------- ACO builder (big-endian byte array) ----------
 function component8to16(v){ return Math.round(v * 257); }
 function pushUint16(arr, v){ arr.push((v>>8)&0xFF); arr.push(v&0xFF); }
 function pushUint32(arr, v){ arr.push((v>>24)&0xFF); arr.push((v>>16)&0xFF); arr.push((v>>8)&0xFF); arr.push(v&0xFF); }
 function pushUTF16BE(arr, str){ for (let i=0;i<str.length;i++){ const code = str.charCodeAt(i); arr.push((code>>8)&0xFF); arr.push(code&0xFF); } }
-
 function buildACO(colors){
   const bytes = [];
   const n = colors.length;
@@ -132,17 +114,16 @@ function buildACO(colors){
     pushUint16(bytes,0);
     const name = c.name||'';
     const nameLen = name.length;
-    // CORREZIONE: La lunghezza è solo la lunghezza della stringa, non la lunghezza della stringa + 1.
-    pushUint32(bytes,nameLen);
+    // CORREZIONE: La lunghezza del nome deve includere il terminatore nullo.
+    pushUint32(bytes,nameLen + 1);
     if (nameLen>0) {
       pushUTF16BE(bytes,name);
     }
-    // CORREZIONE: Aggiungi sempre il terminatore nullo, che è un campo a sé stante e non viene conteggiato nel campo di lunghezza.
+    // CORREZIONE: Aggiungi il terminatore nullo (0x0000) dopo il nome.
     pushUint16(bytes,0);
   }
   return new Uint8Array(bytes);
 }
-
 // ---------- UI wiring ----------
 const fileInput = document.getElementById('file');
 const paste = document.getElementById('paste');
@@ -154,10 +135,8 @@ const download = document.getElementById('download');
 const filenameInput = document.getElementById('filename');
 const drop = document.getElementById('drop');
 let currentColors = [];
-
 function showMessage(txt){ message.textContent = txt || ''; }
 function renderPreview(colors){ preview.innerHTML=''; if(!colors||colors.length===0){ preview.innerHTML='<div class="small">Nessuna anteprima disponibile</div>'; return; } for (const c of colors){ const d = document.createElement('div'); d.className='swatch'; d.style.background = `rgb(${c.r},${c.g},${c.b})`; d.title = `${c.name||''} rgb(${c.r},${c.g},${c.b})`; d.textContent = ''; preview.appendChild(d); } }
-
 fileInput.addEventListener('change', async (e)=>{
   const f = e.target.files[0]; if(!f) return;
   const txt = await f.text();
@@ -172,13 +151,10 @@ fileInput.addEventListener('change', async (e)=>{
   const baseName = f.name.split('.').slice(0, -1).join('.');
   filenameInput.value = `${baseName}.aco`;
 });
-
 importText.addEventListener('click', ()=>{
   const txt = paste.value; if(!txt) return showMessage('Incolla prima qualcosa'); const parsed = detectAndParse(txt); if(parsed.length===0) return showMessage('Nessun colore riconosciuto nel testo'); currentColors = parsed; renderPreview(currentColors); showMessage(`Importati ${parsed.length} colori`);
 });
-
 clearBtn.addEventListener('click', ()=>{ paste.value=''; fileInput.value=''; currentColors=[]; renderPreview([]); showMessage('Pulito'); });
-
 ['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.style.borderColor='#94a3b8'; }));
 ['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.style.borderColor='#e2e8f0'; }));
 drop.addEventListener('drop', async (e)=>{
@@ -196,7 +172,6 @@ drop.addEventListener('drop', async (e)=>{
   const baseName = f.name.split('.').slice(0, -1).join('.');
   filenameInput.value = `${baseName}.aco`;
 });
-
 download.addEventListener('click', ()=>{
   if(!currentColors || currentColors.length===0) return showMessage('Nessun colore da esportare');
   const data = buildACO(currentColors);
@@ -204,7 +179,6 @@ download.addEventListener('click', ()=>{
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href=url; a.download = filenameInput.value || 'palette.aco'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); showMessage('Scaricato ' + a.download);
 });
-
 renderPreview([]);
 </script>
 </body>
