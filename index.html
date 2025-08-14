@@ -113,13 +113,12 @@ function buildACO(colors){
     pushUint16(bytes,component8to16(c.b));
     pushUint16(bytes,0);
     const name = c.name||'';
-    const nameLen = name.length;
     // CORREZIONE: La lunghezza del nome deve includere il terminatore nullo.
-    pushUint32(bytes,nameLen + 1);
-    if (nameLen>0) {
-      pushUTF16BE(bytes,name);
-    }
-    // CORREZIONE: Aggiungi il terminatore nullo (0x0000) dopo il nome.
+    // L'esempio 00 03 00 41 00 62 00 00 per "A2" suggerisce che la lunghezza sia 3 caratteri (A, 2, e il terminatore)
+    const nameLen = name.length + 1;
+    pushUint32(bytes,nameLen);
+    pushUTF16BE(bytes,name);
+    // Aggiungiamo un terminatore nullo a 16 bit
     pushUint16(bytes,0);
   }
   return new Uint8Array(bytes);
